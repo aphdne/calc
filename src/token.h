@@ -17,11 +17,10 @@ struct Token {
 
   const std::string lexeme;
   const Type type;
+
+  std::ostream& operator<<(std::ostream&    p_out);
+  bool          operator==(std::string_view p_str);
+  bool          operator==(Token::Type      p_type);
 };
-
-std::ostream& operator<<(std::ostream& p_out, const Token& p_token);
-
-bool operator==(std::string_view p_str, const Token& p_token);
-bool operator==(const Token& p_token, Token::Type p_type);
 
 #endif /* TOKEN_H */
