@@ -5,22 +5,29 @@
 
 struct Token {
   enum Type {
-    Undefined   = 0,
+    Undefined = 0,
     Identifier,
-    LeftParen   = '(',
-    RightParen  = ')',
-    Divide      = '/',
-    Multiply    = '*',
-    Minus       = '-',
-    Plus        = '+',
+    Digit,
+    OpenParen,
+    CloseParen,
+    Divide,
+    Multiply,
+    Minus,
+    Plus,
   };
 
-  const std::string lexeme;
-  const Type type;
+  Token(std::string_view p_str);
 
-  std::ostream& operator<<(std::ostream&    p_out);
+  static Type get_type(std::string_view p_str);
+
   bool          operator==(std::string_view p_str);
   bool          operator==(Token::Type      p_type);
+
+  std::string lexeme;
+  Type type;
 };
+
+std::ostream& operator<<(std::ostream&    p_out, const Token& p_token);
+// bool operator==(const char p_char, const Token::Type p_type);
 
 #endif /* TOKEN_H */
