@@ -10,7 +10,7 @@ void Lexer::scan(std::string_view p_str) {
       lexeme += ch;
 
     if (ch == ' ' || i == p_str.size()-1) {
-      m_tokens.push_back(Token{lexeme});
+      m_tokens.push_back(Token{lexeme, Token::Type::Undefined});
       lexeme = "";
     }
   }
