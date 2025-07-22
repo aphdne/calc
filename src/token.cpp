@@ -31,5 +31,9 @@ bool Token::operator==(Token::Type p_type) {
 }
 
 bool is_single_char_type(Token::Type p_type) {
-  return p_type > 2;
+  return p_type >= Token::Type::OpenParen;
+}
+
+bool is_operator_type(Token::Type p_type) {
+  return p_type >= Token::Type::Divide;
 }

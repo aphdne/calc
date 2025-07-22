@@ -9,15 +9,16 @@ struct Token {
     /* multi-char */
     Identifier,
     Digit,
-    /* single-char operators */
+    /* single-char */
     OpenParen,  // (
     CloseParen, // )
+    EndLine,    // ;
+    /* single-char operators */
     Divide,     // /
     Multiply,   // *
     Minus,      // -
     Plus,       // +
     Assign,     // =
-    EndLine,    // ;
   };
 
   bool          operator==(std::string_view p_str);
@@ -31,5 +32,6 @@ std::ostream& operator<<(std::ostream&    p_out, const Token& p_token);
 std::ostream& operator<<(std::ostream&    p_out, const Token::Type& p_token_type);
 
 bool is_single_char_type(Token::Type p_type);
+bool is_operator_type(Token::Type p_type);
 
 #endif /* TOKEN_H */
