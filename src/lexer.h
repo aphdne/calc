@@ -10,6 +10,7 @@ public:
   void scan(std::string_view p_str);
   void evaluate();
   void clear();
+  void print();
 
 private:
   std::vector<Token> m_tokens;

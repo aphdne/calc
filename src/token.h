@@ -6,19 +6,19 @@
 struct Token {
   enum Type {
     Undefined = 0,
+    /* multi-char */
     Identifier,
     Digit,
-    OpenParen,
-    CloseParen,
-    Divide,
-    Multiply,
-    Minus,
-    Plus,
+    /* single-char operators */
+    OpenParen,  // (
+    CloseParen, // )
+    Divide,     // /
+    Multiply,   // *
+    Minus,      // -
+    Plus,       // +
+    Assign,     // =
+    EndLine,    // ;
   };
-
-  Token(std::string_view p_str);
-
-  static Type get_type(std::string_view p_str);
 
   bool          operator==(std::string_view p_str);
   bool          operator==(Token::Type      p_type);
@@ -28,6 +28,8 @@ struct Token {
 };
 
 std::ostream& operator<<(std::ostream&    p_out, const Token& p_token);
-// bool operator==(const char p_char, const Token::Type p_type);
+std::ostream& operator<<(std::ostream&    p_out, const Token::Type& p_token_type);
+
+bool is_single_char_type(Token::Type p_type);
 
 #endif /* TOKEN_H */
