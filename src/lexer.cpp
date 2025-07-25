@@ -14,40 +14,7 @@ static inline void del(Token& p_token) {
 }
 
 static Token calculate(const Token& p_lhs, const Token& p_rhs, const Token& p_op) {
-  switch (p_op.type) {
-  case Token::Type::Divide:
-    return Token(p_lhs.to_int() / p_rhs.to_int());
-    break;
-  case Token::Type::Multiply:
-    return Token(p_lhs.to_int() * p_rhs.to_int());
-    break;
-  case Token::Type::Plus:
-    return Token(p_lhs.to_int() + p_rhs.to_int());
-    break;
-  case Token::Type::Minus:
-    return Token(p_lhs.to_int() - p_rhs.to_int());
-    break;
-  default:
-    throw std::logic_error("calculate(): not implemented operator");
-  }
-}
 
-void Lexer::operate(int p_operator) {
-  int l_i{p_operator-1}, r_i{p_operator+1};
-
-  for (; l_i > 0, m_tokens[l_i] != Token::Type::Digit; l_i--) {
-    if (m_tokens[l_i] != Token::Type::Undefined)
-      error("operators require a digit on their left side");
-  }
-
-  for (; r_i > 0, m_tokens[r_i] != Token::Type::Digit; r_i++) {
-    if (m_tokens[r_i] != Token::Type::Undefined)
-      error("operators require a digit on their r_ight side");
-  }
-
-  m_tokens[p_operator] = calculate(m_tokens[l_i], m_tokens[r_i], m_tokens[p_operator]);
-  del(m_tokens[l_i]);
-  del(m_tokens[r_i]);
 }
 
 void Lexer::tokenise(std::string_view p_input) {
@@ -71,6 +38,38 @@ void Lexer::tokenise(std::string_view p_input) {
 
     prev_type = current_type;
   }
+}
+
+void Lexer::operate(int p_operator) {
+  int l_i{p_operator-1}, r_i{p_operator+1};
+
+  for (; l_i > 0, m_tokens[l_i] != Token::Type::Digit; l_i--) {
+    if (m_tokens[l_i] != Token::Type::Undefined)
+      error("operators require a digit on their left side");
+  }
+
+  for (; r_i > 0, m_tokens[r_i] != Token::Type::Digit; r_i++) {
+    if (m_tokens[r_i] != Token::Type::Undefined)
+      error("operators require a digit on their r_ight side");
+  }
+
+  switch (m_tokens[p_operator].type) {
+  case Token::Type::Divide:
+    m_tokens[p_operator] = Token(p_lhs.to_int() / p_rhs.to_int());
+    break;
+  case Token::Type::Multiply:
+    m_tokens[p_operator] = Token(p_lhs.to_int() * p_rhs.to_int());
+    break;
+  case Token::Type::Plus:
+    m_tokens[p_operator] = Token(p_lhs.to_int() + p_rhs.to_int());
+    break;
+  case Token::Type::Minus:
+    m_tokens[p_operator] = Token(p_lhs.to_int() - p_rhs.to_int());
+    break;
+  }
+
+  del(m_tokens[l_i]);
+  del(m_tokens[r_i]);
 }
 
 // TODO: identifiers
@@ -120,7 +119,7 @@ void Lexer::evaluate() {
     if (is_operator_type(m_tokens[i].type))
       operators.push_back(i);
 
-  // sort operators
+  // sort operators - follows the enum defined in token.h
   std::sort(operators.begin(), operators.end(), [this](int a, int b) {
                                                   return m_tokens[a].type < m_tokens[b].type;
                                                 });
@@ -158,7 +157,6 @@ void Lexer::clear() {
 }
 
 void Lexer::print() const {
-  for (const Token& t : m_tokens) {
+  for (const Token& t : m_tokens)
     std::cout << t << std::endl;
-  }
 }

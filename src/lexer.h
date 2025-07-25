@@ -9,10 +9,10 @@
 class Lexer {
 public:
   void tokenise(std::string_view p_str);
+  void operate(int p_operator);
   void evaluate();
   void clear();
   void print() const;
-  void operate(int p_operator);
 
 private:
   std::vector<Token> m_tokens;
