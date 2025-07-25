@@ -62,49 +62,52 @@ void Lexer::evaluate() {
     print();
   }
 
-  auto operator_present = [this](){
-    for (Token& t : m_tokens)
-      if (is_operator_type(t.type))
-        return true;
-    return false;
-  };
-
-  while (operator_present()) {
-    int size = m_tokens.size();
-    for (int i = 0; i < size; i++) {
-      if (size != m_tokens.size()) {
-        i--;
-        size = m_tokens.size();
-        continue;
-      }
-
-      if (is_operator_type(m_tokens[i].type)) {
-        if (i == 0 || i == m_tokens.size()-1) {
-          error("operations must have a left-hand and right-hand symbol");
-          clear();
-          return;
+  std::vector<std::pair<int,int>> parentheses{};
+  int close_amt{};
+  for (int i = 0; i < m_tokens.size(); i++) {
+    if (m_tokens[i].type == Token::Type::OpenParen) {
+      int open_amt{1};
+      for (int j = i+1; j < m_tokens.size(); j++) {
+        if (m_tokens[j] == Token::Type::OpenParen) {
+          open_amt++;
+        } else if (m_tokens[j] == Token::Type::CloseParen) {
+          close_amt--;
+          open_amt--;
+          if (open_amt == 0) {
+            parentheses.push_back({i, j});
+            break;
+          }
         }
-
-        Token& lhs = m_tokens[i-1];
-        Token& op  = m_tokens[i];
-        Token& rhs = m_tokens[i+1];
-
-        if (lhs.type != Token::Type::Digit || rhs.type != Token::Type::Digit) {
-          error("left-hand symbol must be a digit/identifier; right-hand symbol must be a digit");
-          clear();
-          return;
-        }
-
-        op = calculate(lhs, rhs, op);
-        m_tokens.erase(m_tokens.begin()+i-1);
-        m_tokens.erase(m_tokens.begin()+i);
       }
+      if (open_amt > 0) {
+        error("unmatched open parenthesis '('");
+        clear();
+        return;
+      }
+    } else if (m_tokens[i].type == Token::Type::CloseParen) {
+      close_amt++;
+    }
+  }
+  if (close_amt > 0) {
+    error("unmatched close parenthesis ')'");
+    clear();
+    return;
+  }
+
+  for (std::pair<int, int> p : parentheses) {
+    std::cout << "[" << p.first << ", " << p.second << "]\n";
+  }
+
+  std::vector<int> operators{};
+  for (int i = 0; i < m_tokens.size(); i++) {
+    if (is_operator_type(m_tokens[i].type)) {
+      operators.push_back(i);
     }
   }
 
   std::cout << m_tokens[0].lexeme << std::endl;
 
-  m_tokens.clear();
+  clear();
 }
 
 void Lexer::clear() {
