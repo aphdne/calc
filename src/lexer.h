@@ -11,6 +11,7 @@ public:
   void evaluate();
   void clear();
   void print() const;
+  void operate(int p_operator);
 
 private:
   std::vector<Token> m_tokens;

@@ -26,6 +26,24 @@ static Token calculate(const Token& p_lhs, const Token& p_rhs, const Token& p_op
   return { "NaN", Token::Type::Undefined };
 }
 
+void Lexer::operate(int p_operator) {
+  int li{p_operator-1}, ri{p_operator+1};
+
+  for (; li > 0, m_tokens[li] != Token::Type::Digit; li--) {
+    if (m_tokens[li] != Token::Type::Undefined)
+      error("operators require a digit on their left side");
+  }
+
+  for (; ri > 0, m_tokens[ri] != Token::Type::Digit; ri++) {
+    if (m_tokens[ri] != Token::Type::Undefined)
+      error("operators require a digit on their right side");
+  }
+
+  m_tokens[p_operator] = calculate(m_tokens[li], m_tokens[ri], m_tokens[p_operator]);
+  m_tokens[li]={"DELETED", Token::Type::Undefined};
+  m_tokens[ri]={"DELETED", Token::Type::Undefined};
+}
+
 void Lexer::tokenise(std::string_view p_input) {
   std::string lexeme{};
   Token::Type current_type{get_token_type(p_input.at(0))};
@@ -94,9 +112,9 @@ void Lexer::evaluate() {
     return;
   }
 
-  for (std::pair<int, int> p : parentheses) {
-    std::cout << "[" << p.first << ", " << p.second << "]\n";
-  }
+  // for (std::pair<int, int> p : parentheses) {
+  //   std::cout << "[" << p.first << ", " << p.second << "]\n";
+  // }
 
   std::vector<int> operators{};
   for (int i = 0; i < m_tokens.size(); i++) {
@@ -105,7 +123,28 @@ void Lexer::evaluate() {
     }
   }
 
-  std::cout << m_tokens[0].lexeme << std::endl;
+  for (const std::pair<int, int>& p : parentheses) {
+    // for (int o : operators) {
+    for (int i = 0; i < operators.size(); i++) {
+      int o = operators[i];
+      if (o > p.first && o < p.second) {
+        operate(o);
+        operators.erase(operators.begin() + i);
+      }
+      m_tokens[p.first]={"DELETED", Token::Type::Undefined};
+      m_tokens[p.second]={"DELETED", Token::Type::Undefined};
+    }
+  }
+
+  for (int o : operators) {
+    operate(o);
+  }
+
+  for (const Token& t : m_tokens) {
+    if (t.type == Token::Type::Undefined)
+      continue;
+    std::cout << t.lexeme << "\n";
+  }
 
   clear();
 }
