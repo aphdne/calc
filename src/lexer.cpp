@@ -1,11 +1,16 @@
 #include "lexer.h"
 
-static void error(std::string_view p_errmsg) {
+static inline void error(std::string_view p_errmsg) {
   std::cout << "\e[1;31m[error] " << p_errmsg << "\e[0m\n";
 }
 
-static void alert(std::string_view p_errmsg) {
+static inline void alert(std::string_view p_errmsg) {
   std::cout << "\e[1;33m[alert] " << p_errmsg << "\e[0m\n";
+}
+
+static inline void del(Token& p_token) {
+  p_token.type = Token::Type::Undefined;
+  p_token.lexeme = "";
 }
 
 static Token calculate(const Token& p_lhs, const Token& p_rhs, const Token& p_op) {
@@ -22,26 +27,27 @@ static Token calculate(const Token& p_lhs, const Token& p_rhs, const Token& p_op
   case Token::Type::Minus:
     return Token(p_lhs.to_int() - p_rhs.to_int());
     break;
+  default:
+    throw std::logic_error("calculate(): not implemented operator");
   }
-  return { "NaN", Token::Type::Undefined };
 }
 
 void Lexer::operate(int p_operator) {
-  int li{p_operator-1}, ri{p_operator+1};
+  int l_i{p_operator-1}, r_i{p_operator+1};
 
-  for (; li > 0, m_tokens[li] != Token::Type::Digit; li--) {
-    if (m_tokens[li] != Token::Type::Undefined)
+  for (; l_i > 0, m_tokens[l_i] != Token::Type::Digit; l_i--) {
+    if (m_tokens[l_i] != Token::Type::Undefined)
       error("operators require a digit on their left side");
   }
 
-  for (; ri > 0, m_tokens[ri] != Token::Type::Digit; ri++) {
-    if (m_tokens[ri] != Token::Type::Undefined)
-      error("operators require a digit on their right side");
+  for (; r_i > 0, m_tokens[r_i] != Token::Type::Digit; r_i++) {
+    if (m_tokens[r_i] != Token::Type::Undefined)
+      error("operators require a digit on their r_ight side");
   }
 
-  m_tokens[p_operator] = calculate(m_tokens[li], m_tokens[ri], m_tokens[p_operator]);
-  m_tokens[li]={"DELETED", Token::Type::Undefined};
-  m_tokens[ri]={"DELETED", Token::Type::Undefined};
+  m_tokens[p_operator] = calculate(m_tokens[l_i], m_tokens[r_i], m_tokens[p_operator]);
+  del(m_tokens[l_i]);
+  del(m_tokens[r_i]);
 }
 
 void Lexer::tokenise(std::string_view p_input) {
@@ -58,7 +64,7 @@ void Lexer::tokenise(std::string_view p_input) {
       if (prev_type != Token::Undefined)
         m_tokens.push_back({ lexeme, prev_type });
       else if (lexeme != " ")
-        alert("lexeme \"" + lexeme + "\" is undefined; ignoring");
+        alert("symbol \"" + lexeme + "\" is undefined; ignoring");
       lexeme = "";
     }
     lexeme += ch;
@@ -67,7 +73,7 @@ void Lexer::tokenise(std::string_view p_input) {
   }
 }
 
-// TODO: order of operations, identifiers
+// TODO: identifiers
 void Lexer::evaluate() {
   if (m_tokens.empty())
     return;
@@ -75,9 +81,6 @@ void Lexer::evaluate() {
   if (m_tokens[0] == "clear") {
     system("clear");
     return;
-  } else if (m_tokens[0] == "print") {
-    m_tokens.erase(m_tokens.begin());
-    print();
   }
 
   std::vector<std::pair<int,int>> parentheses{};
@@ -112,27 +115,25 @@ void Lexer::evaluate() {
     return;
   }
 
-  // for (std::pair<int, int> p : parentheses) {
-  //   std::cout << "[" << p.first << ", " << p.second << "]\n";
-  // }
-
   std::vector<int> operators{};
-  for (int i = 0; i < m_tokens.size(); i++) {
-    if (is_operator_type(m_tokens[i].type)) {
+  for (int i = 0; i < m_tokens.size(); i++)
+    if (is_operator_type(m_tokens[i].type))
       operators.push_back(i);
-    }
-  }
+
+  // sort operators
+  std::sort(operators.begin(), operators.end(), [this](int a, int b) {
+                                                  return m_tokens[a].type < m_tokens[b].type;
+                                                });
 
   for (const std::pair<int, int>& p : parentheses) {
-    // for (int o : operators) {
     for (int i = 0; i < operators.size(); i++) {
       int o = operators[i];
       if (o > p.first && o < p.second) {
         operate(o);
         operators.erase(operators.begin() + i);
       }
-      m_tokens[p.first]={"DELETED", Token::Type::Undefined};
-      m_tokens[p.second]={"DELETED", Token::Type::Undefined};
+      del(m_tokens[p.first]);
+      del(m_tokens[p.second]);
     }
   }
 
@@ -140,10 +141,13 @@ void Lexer::evaluate() {
     operate(o);
   }
 
+  // by this point m_tokens should be populated by mostly undefined tokens & all operations should have converged into one token
+  // so we print that single undefined token as our answer & clear m_tokens
   for (const Token& t : m_tokens) {
     if (t.type == Token::Type::Undefined)
       continue;
     std::cout << t.lexeme << "\n";
+    break;
   }
 
   clear();

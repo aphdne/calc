@@ -17,8 +17,8 @@ struct Token {
     /* single-char operators */
     Divide,     // /
     Multiply,   // *
-    Minus,      // -
     Plus,       // +
+    Minus,      // -
     Assign,     // =
   };
 
