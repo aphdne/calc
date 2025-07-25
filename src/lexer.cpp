@@ -13,10 +13,6 @@ static inline void del(Token& p_token) {
   p_token.lexeme = "";
 }
 
-static Token calculate(const Token& p_lhs, const Token& p_rhs, const Token& p_op) {
-
-}
-
 void Lexer::tokenise(std::string_view p_input) {
   std::string lexeme{};
   Token::Type current_type{get_token_type(p_input.at(0))};
