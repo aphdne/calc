@@ -2,7 +2,6 @@
 #include <vector>
 #include <cmath>
 
-#define STATEMENT "3 - 616"
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
 
@@ -89,11 +88,7 @@ std::string int_to_str(int p_int) {
   return r;
 }
 
-int main() {
-  std::string statement{STATEMENT};
-  statement += ' ';
-  std::vector<Token> tokens{};
-
+void tokenise(std::vector<Token>& tokens, std::string_view statement) {
   std::string lexeme{};
   Token::Type prev_type{};
   for (int i = 0; i < statement.size(); i++) {
@@ -136,7 +131,9 @@ int main() {
 
     prev_type = curr_type;
   }
+}
 
+void evaluate(std::vector<Token>& tokens) {
   for (int i = 0; i < tokens.size(); i++) {
     Token& token = tokens[i];
     if (is_operator(token)) {
@@ -165,8 +162,21 @@ int main() {
       i -= 2;
     }
   }
+}
 
-  for (Token& t : tokens) {
-    std::cout << "[" << t.lexeme << ", " << t.type << "]\n";
+int main() {
+  std::string statement{};
+  while (getline(std::cin, statement)) {
+    statement += ' ';
+    std::vector<Token> tokens{};
+
+    tokenise(tokens, statement);
+    evaluate(tokens);
+
+    for (Token& t : tokens) {
+      std::cout << "[" << t.lexeme << ", " << t.type << "]\n";
+    }
+
+    tokens.clear();
   }
 }
