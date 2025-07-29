@@ -1,5 +1,5 @@
 CC=g++
-FLAGS=-Wfatal-errors
+FLAGS=-Wfatal-errors -DDO_PRINTING
 BIN=./calc
 
 SRC=src/main.cpp
@@ -7,9 +7,11 @@ SRC=src/main.cpp
 all: calc
 
 clean:
-	rm ${BIN}
+	@if [ -f ${BIN} ]; then\
+		rm ${BIN};\
+	fi
 
-calc:
+calc: clean
 	${CC} ${FLAGS} ${SRC} -o ${BIN}
 
 run: calc
