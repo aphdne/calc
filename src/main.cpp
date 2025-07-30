@@ -5,7 +5,7 @@
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
-#define PRINT_TOKENS for (Token& t : tokens)\
+#define PRINT_TOKENS(x) for (Token& t : x)\
                        std::cout << t.lexeme << ", " << t.type << "\n"
 
 // TODO: floating numbers, variables, encapsulation?
@@ -222,7 +222,7 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
       case '/': curr_type = Token::Type::Divide;     break;
       case '+': curr_type = Token::Type::Plus;       break;
       case '-': curr_type = Token::Type::Minus;
-        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || prev_type == Token::Type::Undefined) && is_number(statement.at(i+1)))
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type == Token::Type::Undefined && i != 0)) && is_number(statement.at(i+1)))
           curr_type = Token::Type::Integer;
         break;
       }
@@ -243,13 +243,32 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
   }
 }
 
-int main() {
-  std::cout << "github: aphdne/calc\n";
-  std::cout << "> ";
-
+int main(int argc, char* argv[]) {
   std::string statement{};
   std::vector<Token> tokens{};
-  while (getline(std::cin, statement)) {
+
+  if (argc == 1) {
+    std::cout << "github: aphdne/calc\n";
+    std::cout << "> ";
+
+    while (getline(std::cin, statement)) {
+      statement += ' ';
+
+      tokenise(tokens, statement);
+      parse(tokens);
+
+      for (Token& t : tokens)
+        if (t.type != Token::Type::Undefined)
+          std::cout << t.lexeme << "\n";
+
+      tokens.clear();
+      std::cout << "> ";
+    }
+  } else {
+    for (int i = 1; i < argc; i++) {
+      std::string s = argv[i];
+      statement += s;
+    }
     statement += ' ';
 
     tokenise(tokens, statement);
@@ -258,8 +277,5 @@ int main() {
     for (Token& t : tokens)
       if (t.type != Token::Type::Undefined)
         std::cout << t.lexeme << "\n";
-
-    tokens.clear();
-    std::cout << "> ";
   }
 }
