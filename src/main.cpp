@@ -5,6 +5,10 @@
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
+#define PRINT_TOKENS   for (Token& t : tokens)\
+                         std::cout << t.lexeme << ", " << t.type << "\n"
+
+// TODO: floating numbers, variables
 
 inline void error(std::string_view msg) {
   std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
@@ -13,7 +17,9 @@ inline void error(std::string_view msg) {
 struct Token {
   enum Type {
     Undefined = 0,
-    Digit,
+    Integer,
+    OpenParen,
+    CloseParen,
     Divide,
     Multiply,
     Plus,
@@ -34,7 +40,7 @@ inline bool is_number(char ch) {
 
 std::ostream& operator<<(std::ostream& out, const Token::Type ttype) {
   switch (ttype) {
-    case Token::Type::Digit:     return out << "DIGIT";
+    case Token::Type::Integer:     return out << "DIGIT";
     case Token::Type::Plus:      return out << "PLUS";
     case Token::Type::Minus:     return out << "MINUS";
     case Token::Type::Divide:    return out << "DIVIDE";
@@ -100,15 +106,17 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
     Token::Type curr_type{};
 
     if (is_number(ch)) {
-      curr_type = Token::Type::Digit;
+      curr_type = Token::Type::Integer;
     } else {
       switch (ch) {
-      case '*': curr_type = Token::Type::Multiply; break;
-      case '/': curr_type = Token::Type::Divide; break;
-      case '+': curr_type = Token::Type::Plus; break;
+      case '(': curr_type = Token::Type::OpenParen;  break;
+      case ')': curr_type = Token::Type::CloseParen; break;
+      case '*': curr_type = Token::Type::Multiply;   break;
+      case '/': curr_type = Token::Type::Divide;     break;
+      case '+': curr_type = Token::Type::Plus;       break;
       case '-': curr_type = Token::Type::Minus;
-        if (i < statement.size() - 1 && !(prev_type == Token::Type::Digit || prev_type == Token::Type::Undefined) && is_number(statement.at(i+1)))
-          curr_type = Token::Type::Digit;
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || prev_type == Token::Type::Undefined) && is_number(statement.at(i+1)))
+          curr_type = Token::Type::Integer;
         break;
       }
     }
@@ -128,6 +136,39 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
   }
 }
 
+void operate(std::vector<Token>& tokens, int op_i) {
+  Token& token = tokens[op_i];
+
+  int lhs_i = op_i - 1;
+  int rhs_i = op_i + 1;
+
+  for (; lhs_i > 0, tokens[lhs_i].type != Token::Type::Integer; lhs_i--) {
+    if (tokens[lhs_i].type != Token::Type::Undefined)
+      error("operators require a digit on their left side");
+  }
+
+  for (; rhs_i > 0, tokens[rhs_i].type != Token::Type::Integer; rhs_i++) {
+    if (tokens[rhs_i].type != Token::Type::Undefined)
+      error("operators require a digit on their right side");
+  }
+
+  int lhs = str_to_int(tokens[lhs_i].lexeme);
+  int rhs = str_to_int(tokens[rhs_i].lexeme);
+
+  int r{};
+  switch (token.type) {
+  case Token::Type::Divide:   r = lhs / rhs; break;
+  case Token::Type::Multiply: r = lhs * rhs; break;
+  case Token::Type::Plus:     r = lhs + rhs; break;
+  case Token::Type::Minus:    r = lhs - rhs; break;
+  }
+
+  token = {int_to_str(r), Token::Type::Integer};
+
+  tokens[lhs_i] = {"", Token::Type::Undefined};
+  tokens[rhs_i] = {"", Token::Type::Undefined};
+}
+
 void parse(std::vector<Token>& tokens) {
   std::vector<int> operators{};
   for (int i = 0; i < tokens.size(); i++) {
@@ -140,42 +181,55 @@ void parse(std::vector<Token>& tokens) {
     }
   }
 
+  // sort by order of operation (defined in Token enum)
   std::sort(operators.begin(), operators.end(), [tokens](int a, int b) {
                                                   return tokens[a].type < tokens[b].type;
                                                 });
 
+  std::vector<std::pair<int,int>> parentheses{};
+  int close_amt{};
+  for (int i = 0; i < tokens.size(); i++) {
+    if (tokens[i].type == Token::Type::OpenParen) {
+      int open_amt{1};
+      for (int j = i+1; j < tokens.size(); j++) {
+        if (tokens[j].type == Token::Type::OpenParen) {
+          open_amt++;
+        } else if (tokens[j].type == Token::Type::CloseParen) {
+          close_amt--;
+          open_amt--;
+          if (open_amt == 0) {
+            parentheses.push_back({i, j});
+            break;
+          }
+        }
+      }
+      if (open_amt > 0) {
+        error("unmatched open parenthesis '('");
+        return;
+      }
+    } else if (tokens[i].type == Token::Type::CloseParen) {
+      close_amt++;
+    }
+  }
+  if (close_amt > 0) {
+    error("unmatched close parenthesis ')'");
+    return;
+  }
+
+  for (const std::pair<int, int>& p : parentheses) {
+    for (int i = 0; i < operators.size(); i++) {
+      int o = operators[i];
+      if (o > p.first && o < p.second) {
+        operate(tokens, o);
+        operators.erase(operators.begin() + i);
+      }
+      tokens[p.first] = {"", Token::Type::Undefined};
+      tokens[p.second] = {"", Token::Type::Undefined};
+    }
+  }
+
   for (int i = 0; i < operators.size(); i++) {
-    int t_i = operators[i];
-    Token& token = tokens[t_i];
-
-    int lhs_i = t_i - 1;
-    int rhs_i = t_i + 1;
-
-    for (; lhs_i > 0, tokens[lhs_i].type != Token::Type::Digit; lhs_i--) {
-      if (tokens[lhs_i].type != Token::Type::Undefined)
-        error("operators require a digit on their left side");
-    }
-
-    for (; rhs_i > 0, tokens[rhs_i].type != Token::Type::Digit; rhs_i++) {
-      if (tokens[rhs_i].type != Token::Type::Undefined)
-        error("operators require a digit on their right side");
-    }
-
-    int lhs = str_to_int(tokens[lhs_i].lexeme);
-    int rhs = str_to_int(tokens[rhs_i].lexeme);
-
-    int r{};
-    switch (token.type) {
-    case Token::Type::Divide:   r = lhs / rhs; break;
-    case Token::Type::Multiply: r = lhs * rhs; break;
-    case Token::Type::Plus:     r = lhs + rhs; break;
-    case Token::Type::Minus:    r = lhs - rhs; break;
-    }
-
-    token = {int_to_str(r), Token::Type::Digit};
-
-    tokens[lhs_i] = {"", Token::Type::Undefined};
-    tokens[rhs_i] = {"", Token::Type::Undefined};
+    operate(tokens, operators[i]);
   }
 }
 
