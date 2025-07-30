@@ -5,14 +5,10 @@
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
-#define PRINT_TOKENS   for (Token& t : tokens)\
-                         std::cout << t.lexeme << ", " << t.type << "\n"
+#define PRINT_TOKENS for (Token& t : tokens)\
+                       std::cout << t.lexeme << ", " << t.type << "\n"
 
-// TODO: floating numbers, variables
-
-inline void error(std::string_view msg) {
-  std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
-}
+// TODO: floating numbers, variables, encapsulation?
 
 struct Token {
   enum Type {
@@ -30,63 +26,37 @@ struct Token {
   Type type;
 };
 
-inline bool is_operator(const Token& t) {
-  return t.type >= Token::Type::Divide;
+inline void error(std::string_view msg);
+static std::string int_to_str(int num);
+inline bool is_operator(const Token& token);
+inline bool is_number(char ch);
+static std::ostream& operator<<(std::ostream& out, const Token::Type type);
+static void operate(std::vector<Token>& tokens, int op_i);
+static void parse(std::vector<Token>& tokens);
+static int str_to_int(std::string str);
+static void tokenise(std::vector<Token>& tokens, std::string_view statement);
+
+void error(std::string_view msg) {
+  std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
 }
 
-inline bool is_number(char ch) {
-  return ch >= '0' && ch <= '9';
-}
-
-std::ostream& operator<<(std::ostream& out, const Token::Type ttype) {
-  switch (ttype) {
-    case Token::Type::Integer:     return out << "DIGIT";
-    case Token::Type::Plus:      return out << "PLUS";
-    case Token::Type::Minus:     return out << "MINUS";
-    case Token::Type::Divide:    return out << "DIVIDE";
-    case Token::Type::Multiply:  return out << "MULTIPLY";
-    default:                     return out << "UNDEFINED";
-  }
-}
-
-int str_to_int(std::string str) {
-  int result{};
-  bool negative{};
-
-  if (str[0] == '-') {
-    negative = true;
-    str = str.substr(1, str.size()-1);
-  }
-
-  for (int i = 0; i < str.size(); i++) {
-    int i_rev = str.size()-1-i;
-    int ch    = static_cast<int>(str[i_rev]) - 48; // digit chars begin at 48
-    result += ch * std::pow(10, i);
-  }
-
-  if (negative)
-    result -= result*2;
-
-  return result;
-}
-
-std::string int_to_str(int p_int) {
-  if (p_int == 0) return "0";
+std::string int_to_str(int num) {
+  if (num == 0) return "0";
 
   bool negative{};
 
-  if (p_int < 0) {
+  if (num < 0) {
     negative = true;
-    p_int -= p_int*2;
+    num -= num*2;
   }
 
   int super{};
-  while (std::pow(10, super) <= p_int)
+  while (std::pow(10, super) <= num)
     super++;
 
   std::string r{};
   for (int i = super; i > 0; i--) {
-    char c = (p_int / static_cast<int>(std::pow(10, i-1))) % 10 + 48;
+    char c = (num / static_cast<int>(std::pow(10, i-1))) % 10 + 48;
     r += c;
   }
 
@@ -96,43 +66,22 @@ std::string int_to_str(int p_int) {
   return r;
 }
 
-void tokenise(std::vector<Token>& tokens, std::string_view statement) {
-  std::string lexeme{};
-  Token::Type prev_type{};
+bool is_operator(const Token& token) {
+  return token.type >= Token::Type::Divide;
+}
 
-  for (int i = 0; i < statement.size(); i++) {
-    char ch = statement.at(i);
+bool is_number(char ch) {
+  return ch >= '0' && ch <= '9';
+}
 
-    Token::Type curr_type{};
-
-    if (is_number(ch)) {
-      curr_type = Token::Type::Integer;
-    } else {
-      switch (ch) {
-      case '(': curr_type = Token::Type::OpenParen;  break;
-      case ')': curr_type = Token::Type::CloseParen; break;
-      case '*': curr_type = Token::Type::Multiply;   break;
-      case '/': curr_type = Token::Type::Divide;     break;
-      case '+': curr_type = Token::Type::Plus;       break;
-      case '-': curr_type = Token::Type::Minus;
-        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || prev_type == Token::Type::Undefined) && is_number(statement.at(i+1)))
-          curr_type = Token::Type::Integer;
-        break;
-      }
-    }
-
-    if (i == 0)
-      prev_type = curr_type;
-
-    if (curr_type != prev_type && prev_type != Token::Type::Undefined) {
-      tokens.push_back({lexeme, prev_type});
-      lexeme = "";
-    }
-
-    if (curr_type != Token::Type::Undefined)
-      lexeme += ch;
-
-    prev_type = curr_type;
+std::ostream& operator<<(std::ostream& out, const Token::Type type) {
+  switch (type) {
+    case Token::Type::Integer:     return out << "DIGIT";
+    case Token::Type::Plus:      return out << "PLUS";
+    case Token::Type::Minus:     return out << "MINUS";
+    case Token::Type::Divide:    return out << "DIVIDE";
+    case Token::Type::Multiply:  return out << "MULTIPLY";
+    default:                     return out << "UNDEFINED";
   }
 }
 
@@ -230,6 +179,67 @@ void parse(std::vector<Token>& tokens) {
 
   for (int i = 0; i < operators.size(); i++) {
     operate(tokens, operators[i]);
+  }
+}
+
+int str_to_int(std::string str) {
+  int result{};
+  bool negative{};
+
+  if (str[0] == '-') {
+    negative = true;
+    str = str.substr(1, str.size()-1);
+  }
+
+  for (int i = 0; i < str.size(); i++) {
+    int i_rev = str.size()-1-i;
+    int ch    = static_cast<int>(str[i_rev]) - 48; // digit chars begin at 48
+    result += ch * std::pow(10, i);
+  }
+
+  if (negative)
+    result -= result*2;
+
+  return result;
+}
+
+void tokenise(std::vector<Token>& tokens, std::string_view statement) {
+  std::string lexeme{};
+  Token::Type prev_type{};
+
+  for (int i = 0; i < statement.size(); i++) {
+    char ch = statement.at(i);
+
+    Token::Type curr_type{};
+
+    if (is_number(ch)) {
+      curr_type = Token::Type::Integer;
+    } else {
+      switch (ch) {
+      case '(': curr_type = Token::Type::OpenParen;  break;
+      case ')': curr_type = Token::Type::CloseParen; break;
+      case '*': curr_type = Token::Type::Multiply;   break;
+      case '/': curr_type = Token::Type::Divide;     break;
+      case '+': curr_type = Token::Type::Plus;       break;
+      case '-': curr_type = Token::Type::Minus;
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || prev_type == Token::Type::Undefined) && is_number(statement.at(i+1)))
+          curr_type = Token::Type::Integer;
+        break;
+      }
+    }
+
+    if (i == 0)
+      prev_type = curr_type;
+
+    if (curr_type != prev_type && prev_type != Token::Type::Undefined) {
+      tokens.push_back({lexeme, prev_type});
+      lexeme = "";
+    }
+
+    if (curr_type != Token::Type::Undefined)
+      lexeme += ch;
+
+    prev_type = curr_type;
   }
 }
 
