@@ -16,3 +16,6 @@ calc: clean
 
 run: calc
 	${BIN}
+
+test: calc
+	./test.sh

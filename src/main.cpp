@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
+#include <cctype>
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
@@ -27,9 +28,9 @@ struct Token {
 };
 
 inline void error(std::string_view msg);
+static int get_operation_order(Token::Type type);
 static std::string int_to_str(int num);
 inline bool is_operator(const Token& token);
-inline bool is_number(char ch);
 static std::ostream& operator<<(std::ostream& out, const Token::Type type);
 static void operate(std::vector<Token>& tokens, int op_i);
 static void parse(std::vector<Token>& tokens);
@@ -38,6 +39,15 @@ static void tokenise(std::vector<Token>& tokens, std::string_view statement);
 
 void error(std::string_view msg) {
   std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
+}
+
+int get_operation_order(Token::Type type) {
+  switch (type) {
+    case Token::Type::Divide:   return 0;
+    case Token::Type::Multiply: return 0;
+    case Token::Type::Plus:     return 1;
+    case Token::Type::Minus:    return 1;
+  }
 }
 
 std::string int_to_str(int num) {
@@ -68,10 +78,6 @@ std::string int_to_str(int num) {
 
 bool is_operator(const Token& token) {
   return token.type >= Token::Type::Divide;
-}
-
-bool is_number(char ch) {
-  return ch >= '0' && ch <= '9';
 }
 
 std::ostream& operator<<(std::ostream& out, const Token::Type type) {
@@ -132,7 +138,7 @@ void parse(std::vector<Token>& tokens) {
 
   // sort by order of operation (defined in Token enum)
   std::sort(operators.begin(), operators.end(), [tokens](int a, int b) {
-                                                  return tokens[a].type < tokens[b].type;
+                                                  return get_operation_order(tokens[a].type) < get_operation_order(tokens[b].type);
                                                 });
 
   std::vector<std::pair<int,int>> parentheses{};
@@ -186,8 +192,10 @@ int str_to_int(std::string str) {
   int result{};
   bool negative{};
 
-  if (str[0] == '-') {
-    negative = true;
+  if (str[0] == '+' || str[0] == '-') {
+    if (str[0] == '-') {
+      negative = true;
+    }
     str = str.substr(1, str.size()-1);
   }
 
@@ -212,7 +220,7 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
 
     Token::Type curr_type{};
 
-    if (is_number(ch)) {
+    if (std::isdigit(ch)) {
       curr_type = Token::Type::Integer;
     } else {
       switch (ch) {
@@ -220,9 +228,12 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
       case ')': curr_type = Token::Type::CloseParen; break;
       case '*': curr_type = Token::Type::Multiply;   break;
       case '/': curr_type = Token::Type::Divide;     break;
-      case '+': curr_type = Token::Type::Plus;       break;
+      case '+': curr_type = Token::Type::Plus;
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type == Token::Type::Undefined && i != 0)) && std::isdigit(statement.at(i+1)))
+          curr_type = Token::Type::Integer;
+        break;
       case '-': curr_type = Token::Type::Minus;
-        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type == Token::Type::Undefined && i != 0)) && is_number(statement.at(i+1)))
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type == Token::Type::Undefined && i != 0)) && std::isdigit(statement.at(i+1)))
           curr_type = Token::Type::Integer;
         break;
       }
