@@ -7,7 +7,6 @@
 
 inline void error(std::string_view msg) {
   std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
-  std::exit(0);
 }
 
 struct Token {
@@ -65,6 +64,8 @@ int str_to_int(std::string str) {
 }
 
 std::string int_to_str(int p_int) {
+  if (p_int == 0) return "0";
+
   bool negative{};
 
   if (p_int < 0) {
@@ -102,12 +103,9 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
       switch (ch) {
       case '*': curr_type = Token::Type::Multiply; break;
       case '/': curr_type = Token::Type::Divide; break;
-      case '+': curr_type = Token::Type::Plus;
-        if (i < statement.size() - 1 && prev_type != Token::Type::Digit && is_number(statement.at(i+1)))
-          curr_type = Token::Type::Digit;
-        break;
+      case '+': curr_type = Token::Type::Plus; break;
       case '-': curr_type = Token::Type::Minus;
-        if (i < statement.size() - 1 && prev_type != Token::Type::Digit && is_number(statement.at(i+1)))
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Digit || prev_type == Token::Type::Undefined) && is_number(statement.at(i+1)))
           curr_type = Token::Type::Digit;
         break;
       }
@@ -133,16 +131,14 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
   }
 }
 
-void evaluate(std::vector<Token>& tokens) {
+void parse(std::vector<Token>& tokens) {
   for (int i = 0; i < tokens.size(); i++) {
     Token& token = tokens[i];
     if (is_operator(token)) {
-      if (i == 0 || i >= tokens.size()-1)
-        continue;
-
-      if (is_operator(tokens[i-1]) || is_operator(tokens[i+1])) {
-        std::string out = tokens[i-1].lexeme + " " + tokens[i].lexeme + " " + tokens[i+1].lexeme;
-        error("invalid operator usage: " + out);
+      if ((i == 0 || i >= tokens.size()-1) || (is_operator(tokens[i-1]) || is_operator(tokens[i+1]))) {
+        error("invalid operator usage");
+        tokens.clear();
+        break;
       }
 
       int lhs = str_to_int(tokens[i-1].lexeme);
@@ -165,18 +161,21 @@ void evaluate(std::vector<Token>& tokens) {
 }
 
 int main() {
+  std::cout << "github: aphdne/calc\n";
+  std::cout << "> ";
+
   std::string statement{};
+  std::vector<Token> tokens{};
   while (getline(std::cin, statement)) {
     statement += ' ';
-    std::vector<Token> tokens{};
 
     tokenise(tokens, statement);
-    evaluate(tokens);
+    parse(tokens);
 
-    for (Token& t : tokens) {
+    for (Token& t : tokens)
       std::cout << "[" << t.lexeme << ", " << t.type << "]\n";
-    }
 
     tokens.clear();
+    std::cout << "> ";
   }
 }

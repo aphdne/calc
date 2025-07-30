@@ -1,5 +1,5 @@
 CC=g++
-FLAGS=-Wfatal-errors -DDO_PRINTING
+FLAGS=-Wfatal-errors
 BIN=./calc
 
 SRC=src/main.cpp
