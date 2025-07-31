@@ -2,6 +2,7 @@
 #include <cctype>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <vector>
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
@@ -18,6 +19,7 @@ struct Token {
     CloseParen,
     Identifier,
     Integer,
+    Assign,
     Divide,
     Multiply,
     Plus,
@@ -28,15 +30,38 @@ struct Token {
   Type type;
 };
 
+void assign(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i);
 inline void error(std::string_view msg);
 static int get_operation_order(Token::Type type);
 static std::string int_to_str(int num);
 inline bool is_operator(const Token& token);
 static std::ostream& operator<<(std::ostream& out, const Token::Type type);
 static void operate(std::vector<Token>& tokens, int op_i);
-static void parse(std::vector<Token>& tokens);
+static void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers);
 static int str_to_int(std::string str);
 static void tokenise(std::vector<Token>& tokens, std::string_view statement);
+
+void assign(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i) {
+  Token& token = tokens[op_i];
+
+  int lhs_i = op_i - 1;
+  int rhs_i = op_i + 1;
+
+  for (; lhs_i > 0, tokens[lhs_i].type != Token::Type::Identifier; lhs_i--) {
+    if (tokens[lhs_i].type != Token::Type::Undefined)
+      error("assign operator `=` requires an identifier on its left side");
+  }
+
+  for (; rhs_i > 0, tokens[rhs_i].type != Token::Type::Integer; rhs_i++) {
+    if (tokens[rhs_i].type != Token::Type::Undefined)
+      error("assign operator `=` requires a digit on its right side");
+  }
+
+  std::string lhs = tokens[lhs_i].lexeme;
+  int rhs = str_to_int(tokens[rhs_i].lexeme);
+
+  identifiers[lhs] = rhs;
+}
 
 void error(std::string_view msg) {
   std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
@@ -44,10 +69,11 @@ void error(std::string_view msg) {
 
 int get_operation_order(Token::Type type) {
   switch (type) {
-    case Token::Type::Divide:   return 0;
-    case Token::Type::Multiply: return 0;
-    case Token::Type::Plus:     return 1;
-    case Token::Type::Minus:    return 1;
+    case Token::Type::Assign:   return 0;
+    case Token::Type::Divide:   return 1;
+    case Token::Type::Multiply: return 1;
+    case Token::Type::Plus:     return 2;
+    case Token::Type::Minus:    return 2;
   }
   return 0;
 }
@@ -79,7 +105,7 @@ std::string int_to_str(int num) {
 }
 
 bool is_operator(const Token& token) {
-  return token.type >= Token::Type::Divide;
+  return token.type >= Token::Type::Assign;
 }
 
 std::ostream& operator<<(std::ostream& out, const Token::Type type) {
@@ -129,7 +155,7 @@ void operate(std::vector<Token>& tokens, int op_i) {
   tokens[rhs_i] = {"", Token::Type::Undefined};
 }
 
-void parse(std::vector<Token>& tokens) {
+void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) {
   std::vector<int> operators{};
   for (int i = 0; i < tokens.size(); i++) {
     if (is_operator(tokens[i])) {
@@ -180,7 +206,10 @@ void parse(std::vector<Token>& tokens) {
     for (int i = 0; i < operators.size(); i++) {
       int o = operators[i];
       if (o > p.first && o < p.second) {
-        operate(tokens, o);
+        if (tokens[o].type == Token::Type::Assign)
+          assign(tokens, identifiers, o);
+        else
+          operate(tokens, o);
         operators.erase(operators.begin() + i);
       }
       tokens[p.first] = {"", Token::Type::Undefined};
@@ -189,7 +218,10 @@ void parse(std::vector<Token>& tokens) {
   }
 
   for (int i = 0; i < operators.size(); i++) {
-    operate(tokens, operators[i]);
+    if (tokens[operators[i]].type == Token::Type::Assign)
+      assign(tokens, identifiers, operators[i]);
+    else
+      operate(tokens, operators[i]);
   }
 }
 
@@ -206,7 +238,7 @@ int str_to_int(std::string str) {
 
   for (int i = 0; i < str.size(); i++) {
     int i_rev = str.size()-1-i;
-    int ch    = static_cast<int>(str[i_rev]) - 48; // digit chars begin at 48
+    int ch = static_cast<int>(str[i_rev]) - 48; // digit chars begin at 48
     result += ch * std::pow(10, i);
   }
 
@@ -233,6 +265,7 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
       switch (ch) {
       case '(': curr_type = Token::Type::OpenParen;  break;
       case ')': curr_type = Token::Type::CloseParen; break;
+      case '=': curr_type = Token::Type::Assign;     break;
       case '*': curr_type = Token::Type::Multiply;   break;
       case '/': curr_type = Token::Type::Divide;     break;
       case '+': curr_type = Token::Type::Plus;
@@ -264,7 +297,7 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
 int main(int argc, char* argv[]) {
   std::string statement{};
   std::vector<Token> tokens{};
-  // std::map<std::string, int> identifiers{};
+  std::map<std::string, int> identifiers{};
 
   if (argc == 1) {
     std::cout << "github: aphdne/calc\n";
@@ -274,14 +307,17 @@ int main(int argc, char* argv[]) {
       statement += ' ';
 
       tokenise(tokens, statement);
-      PRINT_TOKENS(tokens);
-      parse(tokens);
+      parse(tokens, identifiers);
 
-      for (Token& t : tokens)
-        if (t.type != Token::Type::Undefined)
-          std::cout << t.lexeme << "\n";
+      // for (Token& t : tokens)
+      //   if (t.type != Token::Type::Undefined)
+      //     std::cout << t.lexeme << "\n";
+
+      for (const auto& [key, value] : identifiers)
+        std::cout << '[' << key << "] = " << value << ";\n";
 
       tokens.clear();
+
       std::cout << "> ";
     }
   } else {
@@ -292,7 +328,7 @@ int main(int argc, char* argv[]) {
     statement += ' ';
 
     tokenise(tokens, statement);
-    parse(tokens);
+    parse(tokens, identifiers);
 
     for (Token& t : tokens)
       if (t.type != Token::Type::Undefined)
