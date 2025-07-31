@@ -297,14 +297,17 @@ int main(int argc, char* argv[]) {
       statement += ' ';
 
       tokenise(tokens, statement);
-      parse(tokens, identifiers);
 
-      for (Token& t : tokens)
-        if (t.type != Token::Type::Undefined)
-          std::cout << t.lexeme << "\n";
+      if (tokens[0].lexeme == "variables") {
+        for (const auto& [key, value] : identifiers)
+          std::cout << key << ":\t" << value << ";\n";
+      } else {
+        parse(tokens, identifiers);
 
-      for (const auto& [key, value] : identifiers)
-        std::cout << '[' << key << "] = " << value << ";\n";
+        for (Token& t : tokens)
+          if (t.type != Token::Type::Undefined)
+            std::cout << t.lexeme << "\n";
+      }
 
       tokens.clear();
 
