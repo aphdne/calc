@@ -9,13 +9,14 @@
 #define PRINT_TOKENS(x) for (Token& t : x)\
                           std::cout << t.lexeme << ", " << t.type << "\n"
 
-// TODO: floating numbers, variables, encapsulation?
+// TODO: floating numbers, variables
 
 struct Token {
   enum Type {
     Undefined = 0,
     OpenParen,
     CloseParen,
+    Identifier,
     Integer,
     Divide,
     Multiply,
@@ -85,6 +86,7 @@ std::ostream& operator<<(std::ostream& out, const Token::Type type) {
   switch (type) {
     case Token::Type::OpenParen:  return out << "OPENPAREN";
     case Token::Type::CloseParen: return out << "CLOSEPAREN";
+    case Token::Type::Identifier: return out << "IDENTIFIER";
     case Token::Type::Integer:    return out << "DIGIT";
     case Token::Type::Plus:       return out << "PLUS";
     case Token::Type::Minus:      return out << "MINUS";
@@ -225,6 +227,8 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
 
     if (std::isdigit(ch)) {
       curr_type = Token::Type::Integer;
+    } else if (std::isalpha(ch) || ch == '_') {
+      curr_type = Token::Type::Identifier;
     } else {
       switch (ch) {
       case '(': curr_type = Token::Type::OpenParen;  break;
@@ -260,6 +264,7 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
 int main(int argc, char* argv[]) {
   std::string statement{};
   std::vector<Token> tokens{};
+  // std::map<std::string, int> identifiers{};
 
   if (argc == 1) {
     std::cout << "github: aphdne/calc\n";
