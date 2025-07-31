@@ -13,17 +13,20 @@ test() {
   echo -e "$COL$1 = $2"
 }
 
-title "basic tests"
+title "basic"
 test "5 + 5" "10"
 test "5 - 5" "0"
 test "5 \* 5" "25"
 test "5 / 5" "1"
 
-title "signed num tests"
+title "signed num"
 test "5 + -5"  "0"
 test "5 \* -5"  "-25"
 test "5 / -5"  "-1"
 test "-5 - +5" "-10"
 
-title "large strings tests"
+title "parentheses"
+test "(5 + -5)+5"  "5"
+
+title "misc"
 test "5315-63169+56316-5315" "-6853"

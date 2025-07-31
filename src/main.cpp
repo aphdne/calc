@@ -1,22 +1,22 @@
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <iostream>
 #include <vector>
-#include <cctype>
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
 #define PRINT_TOKENS(x) for (Token& t : x)\
-                       std::cout << t.lexeme << ", " << t.type << "\n"
+                          std::cout << t.lexeme << ", " << t.type << "\n"
 
 // TODO: floating numbers, variables, encapsulation?
 
 struct Token {
   enum Type {
     Undefined = 0,
-    Integer,
     OpenParen,
     CloseParen,
+    Integer,
     Divide,
     Multiply,
     Plus,
@@ -48,6 +48,7 @@ int get_operation_order(Token::Type type) {
     case Token::Type::Plus:     return 1;
     case Token::Type::Minus:    return 1;
   }
+  return 0;
 }
 
 std::string int_to_str(int num) {
@@ -82,12 +83,14 @@ bool is_operator(const Token& token) {
 
 std::ostream& operator<<(std::ostream& out, const Token::Type type) {
   switch (type) {
-    case Token::Type::Integer:     return out << "DIGIT";
-    case Token::Type::Plus:      return out << "PLUS";
-    case Token::Type::Minus:     return out << "MINUS";
-    case Token::Type::Divide:    return out << "DIVIDE";
-    case Token::Type::Multiply:  return out << "MULTIPLY";
-    default:                     return out << "UNDEFINED";
+    case Token::Type::OpenParen:  return out << "OPENPAREN";
+    case Token::Type::CloseParen: return out << "CLOSEPAREN";
+    case Token::Type::Integer:    return out << "DIGIT";
+    case Token::Type::Plus:       return out << "PLUS";
+    case Token::Type::Minus:      return out << "MINUS";
+    case Token::Type::Divide:     return out << "DIVIDE";
+    case Token::Type::Multiply:   return out << "MULTIPLY";
+    default:                      return out << "UNDEFINED";
   }
 }
 
@@ -229,11 +232,11 @@ void tokenise(std::vector<Token>& tokens, std::string_view statement) {
       case '*': curr_type = Token::Type::Multiply;   break;
       case '/': curr_type = Token::Type::Divide;     break;
       case '+': curr_type = Token::Type::Plus;
-        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type == Token::Type::Undefined && i != 0)) && std::isdigit(statement.at(i+1)))
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type <= Token::Type::CloseParen && i != 0)) && std::isdigit(statement.at(i+1)))
           curr_type = Token::Type::Integer;
         break;
       case '-': curr_type = Token::Type::Minus;
-        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type == Token::Type::Undefined && i != 0)) && std::isdigit(statement.at(i+1)))
+        if (i < statement.size() - 1 && !(prev_type == Token::Type::Integer || (prev_type <= Token::Type::CloseParen && i != 0)) && std::isdigit(statement.at(i+1)))
           curr_type = Token::Type::Integer;
         break;
       }
@@ -266,6 +269,7 @@ int main(int argc, char* argv[]) {
       statement += ' ';
 
       tokenise(tokens, statement);
+      PRINT_TOKENS(tokens);
       parse(tokens);
 
       for (Token& t : tokens)
