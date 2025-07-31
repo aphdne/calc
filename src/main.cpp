@@ -7,6 +7,7 @@
 
 #define PRINTC(x) std::cout << #x": " << x << ",\t";
 #define PRINTN(x) std::cout << #x": " << x << "\n";
+#define PRINT_TOKEN(x) std::cout << "[" << x.type << ", " << x.lexeme << "\n";
 #define PRINT_TOKENS(x) for (Token& t : x)\
                           std::cout << t.lexeme << ", " << t.type << "\n"
 
@@ -118,23 +119,32 @@ void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers
     rhs_i++;
   }
 
+  Token& lhtoken = tokens[lhs_i];
+  Token& rhtoken = tokens[rhs_i];
+
   if (token.type == Token::Type::Assign) {
-    if (tokens[lhs_i].type != Token::Type::Identifier)
+    if (lhtoken.type != Token::Type::Identifier)
       error("assign operator `=` requires an identifier on its left side");
-    else if (tokens[rhs_i].type != Token::Type::Integer)
+    else if (rhtoken.type != Token::Type::Integer)
       error("assign operator `=` requires a digit on its right side");
 
-    std::string lhs = tokens[lhs_i].lexeme;
-    int rhs = str_to_int(tokens[rhs_i].lexeme);
+    std::string lhs = lhtoken.lexeme;
+    int rhs = str_to_int(rhtoken.lexeme);
 
     identifiers[lhs] = rhs;
 
     token = {lhs, Token::Type::Identifier};
   } else {
-    // FIX: undefined behaviour if tokens[lhs_i] & tokens[rhs_i] are not of integer type
+    // undefined behaviour if lhtoken & rhtoken are not of integer type
+    if (lhtoken.type != Token::Type::Integer || rhtoken.type != Token::Type::Integer) {
+      // PRINT_TOKEN(lhtoken);
+      // PRINT_TOKEN(token);
+      // PRINT_TOKEN(rhtoken);
+      error("integer operation requires integers");
+    }
 
-    int lhs = str_to_int(tokens[lhs_i].lexeme);
-    int rhs = str_to_int(tokens[rhs_i].lexeme);
+    int lhs = str_to_int(lhtoken.lexeme);
+    int rhs = str_to_int(rhtoken.lexeme);
 
     int r{};
     switch (token.type) {
@@ -147,8 +157,8 @@ void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers
     token = {int_to_str(r), Token::Type::Integer};
   }
 
-  tokens[lhs_i] = {"", Token::Type::Undefined};
-  tokens[rhs_i] = {"", Token::Type::Undefined};
+  lhtoken = {"", Token::Type::Undefined};
+  rhtoken = {"", Token::Type::Undefined};
 }
 
 void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) {
@@ -168,7 +178,7 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
                                                   return get_operation_order(tokens[a].type) < get_operation_order(tokens[b].type);
                                                 });
 
-  std::vector<std::pair<int,int>> parentheses{};
+  std::vector<std::pair<int,int>> parens{};
   int close_amt{};
   for (int i = 0; i < tokens.size(); i++) {
     if (tokens[i].type == Token::Type::OpenParen) {
@@ -180,7 +190,7 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
           close_amt--;
           open_amt--;
           if (open_amt == 0) {
-            parentheses.push_back({i, j});
+            parens.push_back({i, j});
             break;
           }
         }
@@ -198,15 +208,28 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
     return;
   }
 
-  for (const std::pair<int, int>& p : parentheses) {
-    for (int i = 0; i < operators.size(); i++) {
-      int o = operators[i];
+  for (int i = parens.size()-1; i >= 0; i--) {
+    auto p = parens[i];
+
+    std::vector<int> ops{};
+    for (int o : operators) {
       if (o > p.first && o < p.second) {
-        operate(tokens, identifiers, o);
-        operators.erase(operators.begin() + i);
+        ops.push_back(o);
       }
-      tokens[p.first] = {"", Token::Type::Undefined};
-      tokens[p.second] = {"", Token::Type::Undefined};
+    }
+
+    for (int j = 0; j < ops.size(); j++) {
+      operate(tokens, identifiers, ops[j]);
+    }
+
+    tokens[p.first] = {"", Token::Type::Undefined};
+    tokens[p.second] = {"", Token::Type::Undefined};
+
+    for (int j = 0; j < operators.size(); j++) {
+      if (!is_operator(tokens[operators[j]])) {
+        operators.erase(operators.begin() + j);
+        j--;
+      }
     }
   }
 
@@ -228,6 +251,9 @@ int str_to_int(std::string str) {
 
   for (int i = 0; i < str.size(); i++) {
     int i_rev = str.size()-1-i;
+    if (!isdigit(str[i_rev]))
+      error("non-digit character found during operation");
+
     int ch = static_cast<int>(str[i_rev]) - 48; // digit chars begin at 48
     result += ch * std::pow(10, i);
   }
