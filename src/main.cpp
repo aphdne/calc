@@ -136,15 +136,19 @@ void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers
     token = {lhs, Token::Type::Identifier};
   } else {
     // undefined behaviour if lhtoken & rhtoken are not of integer type
-    if (lhtoken.type != Token::Type::Integer || rhtoken.type != Token::Type::Integer) {
-      // PRINT_TOKEN(lhtoken);
-      // PRINT_TOKEN(token);
-      // PRINT_TOKEN(rhtoken);
-      error("integer operation requires integers");
+    if (!(lhtoken.type == Token::Type::Integer || lhtoken.type == Token::Type::Identifier)
+     || !(rhtoken.type == Token::Type::Integer || rhtoken.type == Token::Type::Identifier)) {
+      error("integer operation requires integers or variables");
     }
 
-    int lhs = str_to_int(lhtoken.lexeme);
-    int rhs = str_to_int(rhtoken.lexeme);
+    auto resolve_identifier = [identifiers](std::string str) {
+      if (!identifiers.contains(str))
+        error("attempting to use nonexistent variable");
+      return identifiers.at(str);
+    };
+
+    int lhs = (lhtoken.type == Token::Type::Identifier) ? resolve_identifier(lhtoken.lexeme) : str_to_int(lhtoken.lexeme);
+    int rhs = (rhtoken.type == Token::Type::Identifier) ? resolve_identifier(rhtoken.lexeme) : str_to_int(rhtoken.lexeme);
 
     int r{};
     switch (token.type) {
@@ -173,7 +177,6 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
     }
   }
 
-  // sort by order of operation (defined in Token enum)
   std::sort(operators.begin(), operators.end(), [tokens](int a, int b) {
                                                   return get_operation_order(tokens[a].type) < get_operation_order(tokens[b].type);
                                                 });
@@ -235,6 +238,12 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
 
   for (int i = 0; i < operators.size(); i++) {
     operate(tokens, identifiers, operators[i]);
+  }
+
+  for (int i = 0; i < tokens.size(); i++) {
+    if (tokens[i].type == Token::Type::Identifier) {
+      tokens[i].lexeme = int_to_str(identifiers.at(tokens[i].lexeme));
+    }
   }
 }
 
@@ -315,9 +324,11 @@ int main(int argc, char* argv[]) {
   std::vector<Token> tokens{};
   std::map<std::string, int> identifiers{};
 
+  const std::string prompt = "> ";
+
   if (argc == 1) {
     std::cout << "github: aphdne/calc\n";
-    std::cout << "> ";
+    std::cout << prompt;
 
     while (getline(std::cin, statement)) {
       statement += ' ';
@@ -327,6 +338,8 @@ int main(int argc, char* argv[]) {
       if (tokens[0].lexeme == "variables") {
         for (const auto& [key, value] : identifiers)
           std::cout << key << ":\t" << value << ";\n";
+      } else if (tokens[0].lexeme == "clear"){
+        system("clear");
       } else {
         parse(tokens, identifiers);
 
@@ -336,8 +349,7 @@ int main(int argc, char* argv[]) {
       }
 
       tokens.clear();
-
-      std::cout << "> ";
+      std::cout << prompt;
     }
   } else {
     for (int i = 1; i < argc; i++) {
