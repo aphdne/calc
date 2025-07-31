@@ -30,41 +30,19 @@ struct Token {
   Type type;
 };
 
-void assign(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i);
 inline void error(std::string_view msg);
 static int get_operation_order(Token::Type type);
 static std::string int_to_str(int num);
 inline bool is_operator(const Token& token);
 static std::ostream& operator<<(std::ostream& out, const Token::Type type);
-static void operate(std::vector<Token>& tokens, int op_i);
+static void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i);
 static void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers);
 static int str_to_int(std::string str);
 static void tokenise(std::vector<Token>& tokens, std::string_view statement);
 
-void assign(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i) {
-  Token& token = tokens[op_i];
-
-  int lhs_i = op_i - 1;
-  int rhs_i = op_i + 1;
-
-  for (; lhs_i > 0, tokens[lhs_i].type != Token::Type::Identifier; lhs_i--) {
-    if (tokens[lhs_i].type != Token::Type::Undefined)
-      error("assign operator `=` requires an identifier on its left side");
-  }
-
-  for (; rhs_i > 0, tokens[rhs_i].type != Token::Type::Integer; rhs_i++) {
-    if (tokens[rhs_i].type != Token::Type::Undefined)
-      error("assign operator `=` requires a digit on its right side");
-  }
-
-  std::string lhs = tokens[lhs_i].lexeme;
-  int rhs = str_to_int(tokens[rhs_i].lexeme);
-
-  identifiers[lhs] = rhs;
-}
-
 void error(std::string_view msg) {
   std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
+  std::exit(0);
 }
 
 int get_operation_order(Token::Type type) {
@@ -122,34 +100,52 @@ std::ostream& operator<<(std::ostream& out, const Token::Type type) {
   }
 }
 
-void operate(std::vector<Token>& tokens, int op_i) {
+void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i) {
   Token& token = tokens[op_i];
 
   int lhs_i = op_i - 1;
   int rhs_i = op_i + 1;
 
-  for (; lhs_i > 0, tokens[lhs_i].type != Token::Type::Integer; lhs_i--) {
-    if (tokens[lhs_i].type != Token::Type::Undefined)
+  while (tokens[lhs_i].type == Token::Type::Undefined) {
+    if (lhs_i < 0)
       error("operators require a digit on their left side");
+    lhs_i--;
   }
 
-  for (; rhs_i > 0, tokens[rhs_i].type != Token::Type::Integer; rhs_i++) {
-    if (tokens[rhs_i].type != Token::Type::Undefined)
-      error("operators require a digit on their right side");
+  while (tokens[rhs_i].type == Token::Type::Undefined) {
+    if (rhs_i >= tokens.size())
+      error("operators require a digit on their left side");
+    rhs_i++;
   }
 
-  int lhs = str_to_int(tokens[lhs_i].lexeme);
-  int rhs = str_to_int(tokens[rhs_i].lexeme);
+  if (token.type == Token::Type::Assign) {
+    if (tokens[lhs_i].type != Token::Type::Identifier)
+      error("assign operator `=` requires an identifier on its left side");
+    else if (tokens[rhs_i].type != Token::Type::Integer)
+      error("assign operator `=` requires a digit on its right side");
 
-  int r{};
-  switch (token.type) {
-  case Token::Type::Divide:   r = lhs / rhs; break;
-  case Token::Type::Multiply: r = lhs * rhs; break;
-  case Token::Type::Plus:     r = lhs + rhs; break;
-  case Token::Type::Minus:    r = lhs - rhs; break;
+    std::string lhs = tokens[lhs_i].lexeme;
+    int rhs = str_to_int(tokens[rhs_i].lexeme);
+
+    identifiers[lhs] = rhs;
+
+    token = {lhs, Token::Type::Identifier};
+  } else {
+    // FIX: undefined behaviour if tokens[lhs_i] & tokens[rhs_i] are not of integer type
+
+    int lhs = str_to_int(tokens[lhs_i].lexeme);
+    int rhs = str_to_int(tokens[rhs_i].lexeme);
+
+    int r{};
+    switch (token.type) {
+    case Token::Type::Divide:   r = lhs / rhs; break;
+    case Token::Type::Multiply: r = lhs * rhs; break;
+    case Token::Type::Plus:     r = lhs + rhs; break;
+    case Token::Type::Minus:    r = lhs - rhs; break;
+    }
+
+    token = {int_to_str(r), Token::Type::Integer};
   }
-
-  token = {int_to_str(r), Token::Type::Integer};
 
   tokens[lhs_i] = {"", Token::Type::Undefined};
   tokens[rhs_i] = {"", Token::Type::Undefined};
@@ -206,10 +202,7 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
     for (int i = 0; i < operators.size(); i++) {
       int o = operators[i];
       if (o > p.first && o < p.second) {
-        if (tokens[o].type == Token::Type::Assign)
-          assign(tokens, identifiers, o);
-        else
-          operate(tokens, o);
+        operate(tokens, identifiers, o);
         operators.erase(operators.begin() + i);
       }
       tokens[p.first] = {"", Token::Type::Undefined};
@@ -218,10 +211,7 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
   }
 
   for (int i = 0; i < operators.size(); i++) {
-    if (tokens[operators[i]].type == Token::Type::Assign)
-      assign(tokens, identifiers, operators[i]);
-    else
-      operate(tokens, operators[i]);
+    operate(tokens, identifiers, operators[i]);
   }
 }
 
@@ -309,9 +299,9 @@ int main(int argc, char* argv[]) {
       tokenise(tokens, statement);
       parse(tokens, identifiers);
 
-      // for (Token& t : tokens)
-      //   if (t.type != Token::Type::Undefined)
-      //     std::cout << t.lexeme << "\n";
+      for (Token& t : tokens)
+        if (t.type != Token::Type::Undefined)
+          std::cout << t.lexeme << "\n";
 
       for (const auto& [key, value] : identifiers)
         std::cout << '[' << key << "] = " << value << ";\n";
