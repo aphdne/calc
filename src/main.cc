@@ -11,7 +11,19 @@
 #define PRINT_TOKENS(x) for (Token& t : x)\
                           std::cout << t.lexeme << ", " << t.type << "\n"
 
-// TODO: floating numbers, variables
+// TODO: floating numbers, bundled state?, error handling, arrow keys (+ statement history w/ up & down arrow keys)
+
+/*
+ *  main()
+ *    getline()
+ *      tokenise()
+ *      parse()
+ *        is_operator()
+ *        get_operation_order()
+ *        operate()
+ *          str_to_int()
+ *          int_to_str()
+ */
 
 struct Token {
   enum Type {
@@ -48,11 +60,11 @@ void error(std::string_view msg) {
 
 int get_operation_order(Token::Type type) {
   switch (type) {
-    case Token::Type::Assign:   return 0;
-    case Token::Type::Divide:   return 1;
-    case Token::Type::Multiply: return 1;
-    case Token::Type::Plus:     return 2;
-    case Token::Type::Minus:    return 2;
+    case Token::Type::Divide:   return 0;
+    case Token::Type::Multiply: return 0;
+    case Token::Type::Plus:     return 1;
+    case Token::Type::Minus:    return 1;
+    case Token::Type::Assign:   return 2;
   }
   return 0;
 }
@@ -89,15 +101,15 @@ bool is_operator(const Token& token) {
 
 std::ostream& operator<<(std::ostream& out, const Token::Type type) {
   switch (type) {
-    case Token::Type::OpenParen:  return out << "OPENPAREN";
-    case Token::Type::CloseParen: return out << "CLOSEPAREN";
-    case Token::Type::Identifier: return out << "IDENTIFIER";
-    case Token::Type::Integer:    return out << "DIGIT";
-    case Token::Type::Plus:       return out << "PLUS";
-    case Token::Type::Minus:      return out << "MINUS";
-    case Token::Type::Divide:     return out << "DIVIDE";
-    case Token::Type::Multiply:   return out << "MULTIPLY";
-    default:                      return out << "UNDEFINED";
+  case Token::Type::OpenParen:  return out << "OPENPAREN";
+  case Token::Type::CloseParen: return out << "CLOSEPAREN";
+  case Token::Type::Identifier: return out << "IDENTIFIER";
+  case Token::Type::Integer:    return out << "DIGIT";
+  case Token::Type::Plus:       return out << "PLUS";
+  case Token::Type::Minus:      return out << "MINUS";
+  case Token::Type::Divide:     return out << "DIVIDE";
+  case Token::Type::Multiply:   return out << "MULTIPLY";
+  default:                      return out << "UNDEFINED";
   }
 }
 
@@ -125,11 +137,11 @@ void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers
   if (token.type == Token::Type::Assign) {
     if (lhtoken.type != Token::Type::Identifier)
       error("assign operator `=` requires an identifier on its left side");
-    else if (rhtoken.type != Token::Type::Integer)
-      error("assign operator `=` requires a digit on its right side");
+    else if (!(rhtoken.type == Token::Type::Integer || rhtoken.type == Token::Type::Identifier))
+      error("assign operator `=` requires a digit or identifier on its right side");
 
     std::string lhs = lhtoken.lexeme;
-    int rhs = str_to_int(rhtoken.lexeme);
+    auto rhs = (rhtoken.type == Token::Type::Integer) ? str_to_int(rhtoken.lexeme) : identifiers[rhtoken.lexeme];
 
     identifiers[lhs] = rhs;
 

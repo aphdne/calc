@@ -1,7 +1,7 @@
 CC=g++
 FLAGS=-Wfatal-errors -std=c++20
 BIN=./calc
-SRC=src/main.cpp
+SRC=src/main.cc
 
 all: calc
 
