@@ -43,18 +43,25 @@ struct Token {
   Type type;
 };
 
+using status = bool; // success or failure
+
 inline void error(std::string_view msg);
+inline void fatal_error(std::string_view msg);
 static int get_operation_order(Token::Type type);
 static std::string int_to_str(int num);
 inline bool is_operator(const Token& token);
 static std::ostream& operator<<(std::ostream& out, const Token::Type type);
-static void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i);
-static void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers);
+static status operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i);
+static status parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers);
 static int str_to_int(std::string str);
 static void tokenise(std::vector<Token>& tokens, std::string_view statement);
 
 void error(std::string_view msg) {
   std::cout << "\e[1;31m[error] " << msg << "\e[0m\n";
+}
+
+void fatal_error(std::string_view msg) {
+  error(msg);
   std::exit(0);
 }
 
@@ -113,21 +120,25 @@ std::ostream& operator<<(std::ostream& out, const Token::Type type) {
   }
 }
 
-void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i) {
+status operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers, int op_i) {
   Token& token = tokens[op_i];
 
   int lhs_i = op_i - 1;
   int rhs_i = op_i + 1;
 
   while (tokens[lhs_i].type == Token::Type::Undefined) {
-    if (lhs_i < 0)
+    if (lhs_i < 0) {
       error("operators require a digit on their left side");
+      return false;
+    }
     lhs_i--;
   }
 
   while (tokens[rhs_i].type == Token::Type::Undefined) {
-    if (rhs_i >= tokens.size())
+    if (rhs_i >= tokens.size()) {
       error("operators require a digit on their left side");
+      return false;
+    }
     rhs_i++;
   }
 
@@ -135,32 +146,26 @@ void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers
   Token& rhtoken = tokens[rhs_i];
 
   if (token.type == Token::Type::Assign) {
-    if (lhtoken.type != Token::Type::Identifier)
+    if (lhtoken.type != Token::Type::Identifier) {
       error("assign operator `=` requires an identifier on its left side");
-    else if (!(rhtoken.type == Token::Type::Integer || rhtoken.type == Token::Type::Identifier))
+      return false;
+    } else if (!(rhtoken.type == Token::Type::Integer || rhtoken.type == Token::Type::Identifier)) {
       error("assign operator `=` requires a digit or identifier on its right side");
+      return false;
+    }
 
-    std::string lhs = lhtoken.lexeme;
-    auto rhs = (rhtoken.type == Token::Type::Integer) ? str_to_int(rhtoken.lexeme) : identifiers[rhtoken.lexeme];
-
-    identifiers[lhs] = rhs;
-
-    token = {lhs, Token::Type::Identifier};
+    identifiers[lhtoken.lexeme] = (rhtoken.type == Token::Type::Integer) ? str_to_int(rhtoken.lexeme) : identifiers[rhtoken.lexeme];
+    token = {lhtoken.lexeme, Token::Type::Identifier};
   } else {
     // undefined behaviour if lhtoken & rhtoken are not of integer type
     if (!(lhtoken.type == Token::Type::Integer || lhtoken.type == Token::Type::Identifier)
      || !(rhtoken.type == Token::Type::Integer || rhtoken.type == Token::Type::Identifier)) {
       error("integer operation requires integers or variables");
+      return false;
     }
 
-    auto resolve_identifier = [identifiers](std::string str) {
-      if (!identifiers.contains(str))
-        error("attempting to use nonexistent variable");
-      return identifiers.at(str);
-    };
-
-    int lhs = (lhtoken.type == Token::Type::Identifier) ? resolve_identifier(lhtoken.lexeme) : str_to_int(lhtoken.lexeme);
-    int rhs = (rhtoken.type == Token::Type::Identifier) ? resolve_identifier(rhtoken.lexeme) : str_to_int(rhtoken.lexeme);
+    int lhs = (lhtoken.type == Token::Type::Identifier) ? identifiers.at(lhtoken.lexeme) : str_to_int(lhtoken.lexeme);
+    int rhs = (rhtoken.type == Token::Type::Identifier) ? identifiers.at(rhtoken.lexeme) : str_to_int(rhtoken.lexeme);
 
     int r{};
     switch (token.type) {
@@ -175,15 +180,17 @@ void operate(std::vector<Token>& tokens, std::map<std::string, int>& identifiers
 
   lhtoken = {"", Token::Type::Undefined};
   rhtoken = {"", Token::Type::Undefined};
+
+  return true;
 }
 
-void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) {
+status parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) {
   std::vector<int> operators{};
   for (int i = 0; i < tokens.size(); i++) {
     if (is_operator(tokens[i])) {
       if ((i == 0 || i >= tokens.size()-1) || (is_operator(tokens[i-1]) || is_operator(tokens[i+1]))) {
         error("invalid operator usage");
-        return;
+        return false;
       }
       operators.push_back(i);
     }
@@ -212,7 +219,7 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
       }
       if (open_amt > 0) {
         error("unmatched open parenthesis '('");
-        return;
+        return false;
       }
     } else if (tokens[i].type == Token::Type::CloseParen) {
       close_amt++;
@@ -220,7 +227,7 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
   }
   if (close_amt > 0) {
     error("unmatched close parenthesis ')'");
-    return;
+    return false;
   }
 
   for (int i = parens.size()-1; i >= 0; i--) {
@@ -234,7 +241,8 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
     }
 
     for (int j = 0; j < ops.size(); j++) {
-      operate(tokens, identifiers, ops[j]);
+      if (!operate(tokens, identifiers, ops[j]))
+        return false;
     }
 
     tokens[p.first] = {"", Token::Type::Undefined};
@@ -249,7 +257,8 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
   }
 
   for (int i = 0; i < operators.size(); i++) {
-    operate(tokens, identifiers, operators[i]);
+    if (!operate(tokens, identifiers, operators[i]))
+      return false;
   }
 
   for (int i = 0; i < tokens.size(); i++) {
@@ -257,6 +266,8 @@ void parse(std::vector<Token>& tokens, std::map<std::string, int>& identifiers) 
       tokens[i].lexeme = int_to_str(identifiers.at(tokens[i].lexeme));
     }
   }
+
+  return true;
 }
 
 int str_to_int(std::string str) {
@@ -273,7 +284,7 @@ int str_to_int(std::string str) {
   for (int i = 0; i < str.size(); i++) {
     int i_rev = str.size()-1-i;
     if (!isdigit(str[i_rev]))
-      error("non-digit character found during operation");
+      fatal_error("non-digit character found during operation");
 
     int ch = static_cast<int>(str[i_rev]) - 48; // digit chars begin at 48
     result += ch * std::pow(10, i);
@@ -345,6 +356,8 @@ int main(int argc, char* argv[]) {
     while (getline(std::cin, statement)) {
       statement += ' ';
 
+      tokens.clear();
+
       tokenise(tokens, statement);
 
       if (tokens[0].lexeme == "variables") {
@@ -353,14 +366,12 @@ int main(int argc, char* argv[]) {
       } else if (tokens[0].lexeme == "clear"){
         system("clear");
       } else {
-        parse(tokens, identifiers);
-
-        for (Token& t : tokens)
-          if (t.type != Token::Type::Undefined)
-            std::cout << t.lexeme << "\n";
+        if (parse(tokens, identifiers))
+          for (Token& t : tokens)
+            if (t.type != Token::Type::Undefined)
+              std::cout << t.lexeme << "\n";
       }
 
-      tokens.clear();
       std::cout << prompt;
     }
   } else {
