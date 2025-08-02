@@ -11,7 +11,7 @@
 #define PRINT_TOKENS(x) for (Token& t : x)\
                           std::cout << t.lexeme << ", " << t.type << "\n"
 
-// TODO: floating numbers, bundled state?, error handling, arrow keys (+ statement history w/ up & down arrow keys)
+// TODO: floating numbers, bundled state?, arrow keys (+ statement history w/ up & down arrow keys)
 
 /*
  *  main()
@@ -61,7 +61,7 @@ void error(std::string_view msg) {
 }
 
 void fatal_error(std::string_view msg) {
-  error(msg);
+  std::cout << "\e[1;31m[FATAL] " << msg << "\e[0m\n";
   std::exit(0);
 }
 
